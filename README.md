@@ -1,5 +1,8 @@
 ## Description
-SAT0RU is a real-time cursed technique visualizer based on the popular anime series, Jujutsu Kaisen 呪術廻戦. It combines the mediapipe library with three.js to recreate cursed techniques from Jujutsu Kaisen. Powered by Gemini 3.
+SAT0RU is a real-time cursed technique visualizer based on the popular anime series, Jujutsu Kaisen 呪術廻戦. It combines the mediapipe library with three.js to recreate cursed techniques. Powered by Gemini 3.
+
+![Demo GIF](https://github.com/user-attachments/assets/8ad2b871-02c0-4b97-95f3-34682e745be0)
+
 
 ## Features
 
