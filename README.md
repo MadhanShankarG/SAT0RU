@@ -31,6 +31,10 @@ This project uses particle-based volumetric rendering to visualize cursed techni
 **Visuals:** A dark, oppressive aura representing the King of Curses.  
 **Trigger:** Flat hand / prayer gesture.
 
+### Divine General Mahoraga
+**Visuals:** The Eight-Handled Wheel manifests above the user, rotating slowly as shadows expand and darken the environment. A shadow pool spreads beneath, simulating adaptation energy and overwhelming presence.  
+**Trigger:** Both hands clenched into fists and held steady.
+
 ---
 
 ## Getting Started
