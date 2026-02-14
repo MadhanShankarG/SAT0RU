@@ -159,7 +159,7 @@
         shadowPool.position.y = -25;
         scene.add(shadowPool);
 
-        const COUNT = 20000;
+        const COUNT = 14000;
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(COUNT * 3);
         const colors = new Float32Array(COUNT * 3);
@@ -174,12 +174,12 @@
         geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
         const particles = new THREE.Points(geometry, new THREE.PointsMaterial({
-            size: 0.28,
+            size: 0.26,
             vertexColors: true,
             blending: THREE.AdditiveBlending,
             transparent: true,
             depthWrite: false,
-            opacity: 0.75
+            opacity: 0.65
         }));
         scene.add(particles);
 
@@ -219,7 +219,10 @@
         scene.add(fireArrow);
 
         let shockwaveActive = false;
-        let gravityPull = 0;
+let gravityPull = 0;
+        let voidDriftActive = false;
+        let voidStartTime = 0;
+        const VOID_DRIFT_DELAY = 7.6; // seconds
         let slowMotion = 1;
         let chargingPurple = false;
         let releaseShot = false;
@@ -354,7 +357,7 @@ let mahoragaTriggered = false;
             gsap.to(shadowMat.uniforms.uExpansion, { value: 1.0, duration: 4 });
             gsap.to(shadowMat.uniforms.uOpacity, { value: 0.9, duration: 2 });
             gsap.to(ambientLight, { intensity: 0.02, duration: 3 });
-            bloomPass.strength = 3.0;
+            bloomPass.strength = 1.2;
         }
 
         // Hand Tracking
@@ -415,12 +418,19 @@ let mahoragaTriggered = false;
                     }
                 });
             }
-            if (mahoragaTriggered) detected = 'mahoraga';
+            if (mahoragaTriggered && detected === 'neutral') detected = 'mahoraga';
             updateState(detected);
         });
 
         function updateState(tech) {
             if (currentTech === tech) return;
+            // allow switching out of Mahoraga when new gesture appears
+            if (currentTech === 'mahoraga' && tech !== 'mahoraga') {
+                mahoragaTriggered = false;
+                gsap.to(shadowMat.uniforms.uExpansion, { value: 0, duration: 1.2 });
+                gsap.to(shadowMat.uniforms.uOpacity, { value: 0, duration: 1 });
+                gsap.to(ambientLight, { intensity: 1.0, duration: 1.2 });
+            }
             currentTech = tech;
             stopAllAudio();
             const nameEl = document.getElementById('technique-name');
@@ -429,7 +439,7 @@ let mahoragaTriggered = false;
             if (tech === 'shrine') {
                 glowColor = '#ff0000';
                 nameEl.innerText = "Domain Expansion: Malevolent Shrine";
-                bloomPass.strength = 2.5;
+                bloomPass.strength = 3.4;
                 shockwaveActive = true;
                 gravityPull = 1;
                 slowMotion = 0.4;
@@ -439,33 +449,36 @@ let mahoragaTriggered = false;
             else if (tech === 'purple') {
                 glowColor = '#bb00ff';
                 nameEl.innerText = "Secret Technique: Hollow Purple";
-                bloomPass.strength = 4.0;
+                bloomPass.strength = 4.8;
                 audioPurple.currentTime = 0;
                 audioPurple.play();
             }
             else if (tech === 'void') {
                 glowColor = '#00ffff';
                 nameEl.innerText = "Domain Expansion: Infinite Void";
-                bloomPass.strength = 2.0;
+                bloomPass.strength = 2.8;
                 audioVoid.currentTime = 0;
                 audioVoid.play();
+                voidStartTime = performance.now();
+                voidDriftActive = false;
             }
             else if (tech === 'red') {
                 glowColor = '#ff3333';
                 nameEl.innerText = "Reverse Cursed Technique: Red";
-                bloomPass.strength = 2.5;
+                bloomPass.strength = 3.2;
                 audioRed.currentTime = 0;
                 audioRed.play();
             }
             else if (tech === 'mahoraga') {
                 glowColor = '#ffffff';
                 nameEl.innerText = "DIVINE GENERAL MAHORAGA";
-                bloomPass.strength = 1.4; // reduce overexposure
+                bloomPass.strength = 1.2;
             }
             else { 
                 glowColor = '#00ffff'; 
                 nameEl.innerText = "Neutral State"; 
-                bloomPass.strength = 1.0; 
+                bloomPass.strength = 1.2; 
+                voidDriftActive = false;
             }
 
             for (let i = 0; i < COUNT; i++) {
@@ -505,8 +518,17 @@ let mahoragaTriggered = false;
             
             if (currentTech === 'void' || currentTech === 'shrine') {
                 gravityPull = Math.min(gravityPull + 0.02, 1);
+
+                // activate directional drift after delay
+                if (currentTech === 'void' && !voidDriftActive) {
+                    const elapsed = (performance.now() - voidStartTime) / 1000;
+                    if (elapsed > VOID_DRIFT_DELAY) {
+                        voidDriftActive = true;
+                    }
+                }
             } else {
                 gravityPull *= 0.95;
+                voidDriftActive = false;
             }
 
             if (shakeIntensity > 0) {
@@ -522,6 +544,13 @@ let mahoragaTriggered = false;
             for (let i = 0; i < COUNT * 3; i++) {
                 pos[i] += (targetPositions[i] - pos[i]) * 0.05;
                 pos[i] *= (1 - gravityPull * 0.02);
+
+                // Infinite Void directional drift (space flow effect)
+                if (voidDriftActive && i % 3 === 0) {
+                    pos[i] += 3.5;      // X direction flow
+                    pos[i + 2] -= 0.25; // slight depth stretch
+                }
+
                 col[i] += (targetColors[i] - col[i]) * 0.1;
             }
             for (let i = 0; i < COUNT; i++) siz[i] += (targetSizes[i] - siz[i]) * 0.1;
@@ -532,14 +561,15 @@ let mahoragaTriggered = false;
 
             if (currentTech === 'red') {
                 particles.rotation.z -= 0.1;
+                bloomPass.strength += 0.01;
             } else if (currentTech === 'purple') {
                 particles.rotation.z += 0.2;
                 particles.rotation.y += 0.05;
             } else if (currentTech === 'shrine') {
                 particles.rotation.set(0, 0, 0);
             } else if (currentTech === 'mahoraga') {
-                // rotate on its own axis (not orbit)
-                particles.rotation.z -= 0.01;
+                // slow CLOCKWISE spin
+                particles.rotation.z += 0.004;
 
                 // keep centered and stable
                 particles.position.set(0, 0, 0);
@@ -553,6 +583,7 @@ let mahoragaTriggered = false;
             if (currentTech === 'purple' && chargingPurple) {
                 particles.rotation.z += 0.35;
                 particles.rotation.y += 0.15;
+                bloomPass.strength += 0.02;
             }
 
             if (releaseShot) {
