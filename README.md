@@ -5,7 +5,6 @@ It combines **MediaPipe hand tracking** with **Three.js particle systems** to re
 
 Hand gestures are translated into high-energy particle simulations, domain expansions, and spatial distortions in real time.
 
-Powered by **Gemini 3**.
 
 ![Demo GIF](https://github.com/user-attachments/assets/8ad2b871-02c0-4b97-95f3-34682e745be0)
 
