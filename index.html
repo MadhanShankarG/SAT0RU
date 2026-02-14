@@ -19,7 +19,7 @@
         h1 { 
             font-size: 3rem; margin: 0; letter-spacing: 10px; 
             font-weight: 900; 
-            text-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 0 20px rgba(36, 28, 28, 0.3);
             background: linear-gradient(to bottom, #fff, #888);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -123,6 +123,24 @@
     const particles = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.3, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
     scene.add(particles);
 
+    // Shockwave ring for domain expansion
+    const ringGeometry = new THREE.RingGeometry(5, 6, 64);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide
+    });
+    const shockwaveRing = new THREE.Mesh(ringGeometry, ringMaterial);
+    shockwaveRing.rotation.x = Math.PI / 2;
+    scene.add(shockwaveRing);
+
+    let shockwaveActive = false;
+    let gravityPull = 0;
+    let slowMotion = 1;
+    let chargingPurple = false;
+    let releaseShot = false;
+
     // Technique Functions 
     function getRed(i) {
         if(i < COUNT * 0.1) {
@@ -168,6 +186,28 @@
         } else return { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
     }
 
+    // voice + sound effect (place an audio file named domain.mp3 in same folder)
+    // const domainAudio = new Audio('domain.mp3');
+    // domainAudio.volume = 0.9;
+
+    // Technique voice audio
+    const audioPurple = new Audio('hollow purple audio.mp3');
+    const audioVoid = new Audio('infinite void audio.mp3');
+    const audioShrine = new Audio('malovolent shrine audio.mp3');
+    const audioRed = new Audio('red audio.mp3');
+
+    [audioPurple, audioVoid, audioShrine, audioRed].forEach(a => {
+        a.volume = 0.9;
+    });
+
+    // stop any currently playing audio
+    function stopAllAudio(){
+        [audioPurple, audioVoid, audioShrine, audioRed].forEach(a=>{
+            a.pause();
+            a.currentTime = 0;
+        });
+    }
+
     // Hand Tracking
     let currentTech = 'neutral';
     let shakeIntensity = 0;
@@ -191,10 +231,18 @@
                 const isUp = (t, p) => lm[t].y < lm[p].y;
                 const pinch = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
                 
-                if (pinch < 0.04) detected = 'purple';
+                if (pinch < 0.04) {
+                    detected = 'purple';
+                    chargingPurple = true;
+                }
                 else if (isUp(8,6) && isUp(12,10) && isUp(16,14) && isUp(20,18)) detected = 'shrine';
                 else if (isUp(8,6) && isUp(12,10) && !isUp(16,14)) detected = 'void';
                 else if (isUp(8,6) && !isUp(12,10)) detected = 'red';
+                else if (isUp(8,6) && isUp(12,10) && isUp(16,14) && !isUp(20,18)) detected = 'fuga';
+                else {
+                    if(chargingPurple) releaseShot = true;
+                    chargingPurple = false;
+                }
             });
         }
         updateState(detected);
@@ -203,13 +251,51 @@
     function updateState(tech) {
         if(currentTech === tech) return;
         currentTech = tech;
+        // stop previous technique sound when gesture changes
+        stopAllAudio();
         const nameEl = document.getElementById('technique-name');
         shakeIntensity = tech !== 'neutral' ? 0.4 : 0;
 
-        if(tech === 'shrine') { glowColor = '#ff0000'; nameEl.innerText = "Domain Expansion: Malevolent Shrine"; bloomPass.strength = 2.5; }
-        else if(tech === 'purple') { glowColor = '#bb00ff'; nameEl.innerText = "Secret Technique: Hollow Purple"; bloomPass.strength = 4.0; }
-        else if(tech === 'void') { glowColor = '#00ffff'; nameEl.innerText = "Domain Expansion: Infinite Void"; bloomPass.strength = 2.0; }
-        else if(tech === 'red') { glowColor = '#ff3333'; nameEl.innerText = "Reverse Cursed Technique: Red"; bloomPass.strength = 2.5; }
+        if(tech === 'shrine') { 
+            glowColor = '#ff0000'; 
+            nameEl.innerText = "Domain Expansion: Malevolent Shrine"; 
+            bloomPass.strength = 2.5; 
+            shockwaveActive = true;
+            gravityPull = 1;
+            slowMotion = 0.4;
+
+            audioShrine.currentTime = 0;
+            audioShrine.play();
+        }
+        else if(tech === 'purple') {
+            glowColor = '#bb00ff';
+            nameEl.innerText = "Secret Technique: Hollow Purple";
+            bloomPass.strength = 4.0;
+
+            audioPurple.currentTime = 0;
+            audioPurple.play();
+        }
+        else if(tech === 'void') {
+            glowColor = '#00ffff';
+            nameEl.innerText = "Domain Expansion: Infinite Void";
+            bloomPass.strength = 2.0;
+
+            audioVoid.currentTime = 0;
+            audioVoid.play();
+        }
+        else if(tech === 'red') {
+            glowColor = '#ff3333';
+            nameEl.innerText = "Reverse Cursed Technique: Red";
+            bloomPass.strength = 2.5;
+
+            audioRed.currentTime = 0;
+            audioRed.play();
+        }
+        else if(tech === 'fuga') {
+            glowColor = '#ff6600';
+            nameEl.innerText = "Fuga: Divine Flame";
+            bloomPass.strength = 3.5;
+        }
         else { glowColor = '#00ffff'; nameEl.innerText = "Neutral State"; bloomPass.strength = 1.0; }
 
         for(let i=0; i<COUNT; i++) {
@@ -242,7 +328,14 @@
 
     // Animation
     function animate() {
-        requestAnimationFrame(animate);
+        // gravity pull effect (Infinite Void & Shrine)
+        if(currentTech === 'void' || currentTech === 'shrine'){
+            gravityPull = Math.min(gravityPull + 0.02, 1);
+        } else {
+            gravityPull *= 0.95;
+        }
+
+        // requestAnimationFrame(animate);
         
         if (shakeIntensity > 0) {
             renderer.domElement.style.transform = `translate(${(Math.random()-0.5)*shakeIntensity*40}px, ${(Math.random()-0.5)*shakeIntensity*40}px)`;
@@ -256,6 +349,7 @@
 
         for(let i=0; i<COUNT*3; i++) {
             pos[i] += (targetPositions[i] - pos[i]) * 0.1;
+            pos[i] *= (1 - gravityPull * 0.02);
             col[i] += (targetColors[i] - col[i]) * 0.1;
         }
         for(let i=0; i<COUNT; i++) siz[i] += (targetSizes[i] - siz[i]) * 0.1;
@@ -278,6 +372,38 @@
             particles.rotation.y += 0.005;
         }
 
+        // Hollow Purple charge spin
+        if(currentTech === 'purple' && chargingPurple){
+            particles.rotation.z += 0.35;
+            particles.rotation.y += 0.15;
+        }
+
+        // release projectile burst
+        if(releaseShot){
+            for(let i=0;i<COUNT*3;i++){
+                pos[i] *= 1.4;
+            }
+            releaseShot = false;
+        }
+
+        // shockwave ring animation
+        if(shockwaveActive){
+            shockwaveRing.material.opacity = 0.8;
+            shockwaveRing.scale.x += 0.2;
+            shockwaveRing.scale.y += 0.2;
+            if(shockwaveRing.scale.x > 20){
+                shockwaveRing.scale.set(1,1,1);
+                shockwaveRing.material.opacity = 0;
+                shockwaveActive = false;
+            }
+        }
+
+        // slow motion effect
+        if(slowMotion < 1){
+            slowMotion += 0.02;
+        }
+
+        requestAnimationFrame(animate);
         composer.render();
     }
     animate();
